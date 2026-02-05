@@ -50,7 +50,11 @@ private extension ScanScreen {
         VStack(spacing: 24) {
             deviceFilterPicker
             startScanButton
-            devicesList
+            if isEmptyState {
+                emptyStateView
+            } else {
+                devicesList
+            }
         }
     }
 }
@@ -118,6 +122,26 @@ private extension ScanScreen {
                 }
             }
         }
+    }
+}
+
+private extension ScanScreen {
+    var isEmptyState: Bool {
+        viewModel.filteredBluetooth.isEmpty && viewModel.filteredLan.isEmpty
+    }
+    
+    var emptyStateView: some View {
+        VStack(spacing: 12) {
+            LottieView(name: "broom", loop: true)
+                .frame(height: 180)
+            
+            Text("Нет устройств")
+                .foregroundColor(.secondary)
+            
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 40)
     }
 }
 

@@ -6,11 +6,42 @@
 //
 
 import Foundation
+import Combine
 import RealmSwift
 
 final class DatabaseService {
 
     private let realm = try! Realm()
+    private var sessionsToken: NotificationToken?
+
+    private let sessionsSubject = CurrentValueSubject<[ScanSession], Never>([])
+
+    var sessionsPublisher: AnyPublisher<[ScanSession], Never> {
+        sessionsSubject.eraseToAnyPublisher()
+    }
+
+    init() {
+        observeSessions()
+    }
+
+    private func observeSessions() {
+        let results = realm.objects(RealmScanSession.self)
+            .sorted(byKeyPath: "date", ascending: false)
+
+        sessionsToken = results.observe { [weak self] changes in
+            guard let self else { return }
+
+            switch changes {
+            case .initial(let collection),
+                 .update(let collection, _, _, _):
+                let mapped = Array(collection.map { ScanSessionMapper.fromRealm($0) })
+                sessionsSubject.send(mapped)
+
+            case .error:
+                break
+            }
+        }
+    }
 
     func saveScanSession(bluetooth: [BluetoothDevice], lan: [LanDevice]) {
         let session = RealmScanSession()
@@ -25,29 +56,5 @@ final class DatabaseService {
         try? realm.write {
             realm.add(session)
         }
-    }
-
-    func fetchSessions() -> [ScanSession] {
-        let objects = realm.objects(RealmScanSession.self)
-        return objects.map { ScanSessionMapper.fromRealm($0) }
-    }
-
-    func fetchSession(by id: ObjectId) -> ScanSession? {
-        guard let obj = realm.object(ofType: RealmScanSession.self, forPrimaryKey: id) else {
-            return nil
-        }
-        return ScanSessionMapper.fromRealm(obj)
-    }
-
-    func filterSessions(name: String?, date: Date?) -> [ScanSession] {
-        var predicate = NSPredicate(value: true)
-
-        if let name = name, !name.isEmpty {
-            predicate = NSPredicate(format: "ANY bluetoothDevices.name CONTAINS[c] %@ OR ANY lanDevices.hostname CONTAINS[c] %@", name, name)
-        }
-
-        let results = realm.objects(RealmScanSession.self).filter(predicate)
-
-        return results.map { ScanSessionMapper.fromRealm($0) }
     }
 }

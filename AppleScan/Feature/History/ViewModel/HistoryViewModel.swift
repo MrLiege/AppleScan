@@ -16,6 +16,7 @@ final class HistoryViewModel: ObservableObject {
 
     private let database: DatabaseService
     private let coordinator: HistoryFlowCoordinator
+    private var cancellables = Set<AnyCancellable>()
 
     init(
         database: DatabaseService,
@@ -24,11 +25,12 @@ final class HistoryViewModel: ObservableObject {
         self.database = database
         self.coordinator = coordinator
 
-        loadSessions()
-    }
-
-    func loadSessions() {
-        sessions = database.fetchSessions()
+        database.sessionsPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] sessions in
+                self?.sessions = sessions
+            }
+            .store(in: &cancellables)
     }
 
     var filteredSessions: [ScanSession] {
